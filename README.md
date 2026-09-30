@@ -13,3 +13,6 @@ Local test:
 python -m http.server 5500
 
 Then open http://localhost:5500
+PhysioVision AI - GitHub Pages
+
+Deployment update - 30 Sep 2026
