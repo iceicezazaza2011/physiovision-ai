@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06111d">
+  <title>PhysioVision AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="shell">
+  <nav class="topbar">
+    <div class="brand"><div class="brandmark">PV</div><div><strong>PhysioVision <span>AI</span></strong><small>SMART MOVEMENT ANALYSIS</small></div></div>
+    <span id="aiBadge" class="badge"><i></i><span>AI พร้อมใช้งาน</span></span>
+  </nav>
+
+  <section class="hero">
+    <div><span class="eyebrow">AI PHYSICAL THERAPY</span><h1>ฝึกกายภาพอย่างมั่นใจ</h1><p>ตรวจจับโครงร่าง วัดมุมข้อต่อ และนับจำนวนครั้งแบบเรียลไทม์</p></div>
+    <div class="session-pill"><small>SESSION</small><b id="sessionStatus">พร้อมเริ่ม</b></div>
+  </section>
+
+  <section class="workspace">
+    <div class="left">
+      <article class="panel camera-panel">
+        <div class="panel-head">
+          <div><span class="live-dot"></span><b>LIVE MOTION ANALYSIS</b></div>
+          <span id="fpsLabel">Camera standby</span>
+        </div>
+
+        <div class="stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="canvas"></canvas>
+
+          <div id="message" class="camera-message">
+            <div class="camera-orb">◎</div>
+            <b>พร้อมเริ่มการวิเคราะห์</b>
+            <span>เปิดกล้องเพื่อเริ่มตรวจจับการเคลื่อนไหว</span>
+            <button id="cameraBtn" class="camera-start">เปิดกล้อง</button>
+          </div>
+
+          <div id="cameraControls" class="camera-controls hidden">
+            <button id="switchCameraBtn" title="สลับกล้อง">↻ <span>สลับกล้อง</span></button>
+            <button id="stopCameraBtn" class="danger" title="ปิดกล้อง">■ <span>ปิดกล้อง</span></button>
+          </div>
+
+          <div class="guide"><span>จัดตำแหน่งร่างกายให้อยู่ในกรอบ</span></div>
+
+          <div id="restOverlay" class="rest hidden">
+            <span>พักระหว่างเซต</span><strong id="restCount">30</strong><small>วินาที</small>
+            <button id="skipBtn">ข้ามเวลาพัก</button>
+          </div>
+        </div>
+
+        <div class="camera-footer"><span>● ประมวลผลบนอุปกรณ์ของคุณ</span><span id="trackingText">รอการตรวจจับร่างกาย</span></div>
+      </article>
+
+      <article class="panel tips"><div class="tip-icon">✦</div><div><b>คำแนะนำ</b><p id="tipText">ยืนให้เห็นช่วงไหล่ ศอก และข้อมือชัดเจน เพื่อการวัดมุมที่แม่นยำ</p></div></article>
+    </div>
+
+    <aside class="right">
+      <article class="panel progress-panel">
+        <div class="section-title"><div><span>01</span><b>ความคืบหน้า</b></div><small>LIVE</small></div>
+        <div class="ring-row">
+          <div class="ring" id="repRing"><div><strong id="repsBig">0</strong><span>/ 10 ครั้ง</span></div></div>
+          <div class="set-info"><small>เซตปัจจุบัน</small><strong><span id="setNow">1</span><i>/ 3</i></strong><div class="set-dots"><i class="on"></i><i></i><i></i></div></div>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><small>มุมข้อต่อ</small><strong id="angle">--°</strong><span>ANGLE</span></div>
+          <div class="metric"><small>สถานะท่า</small><strong id="state">READY</strong><span>STATE</span></div>
+        </div>
+      </article>
+
+      <article class="panel controls">
+        <div class="section-title"><div><span>02</span><b>เลือกท่ากายภาพ</b></div></div>
+        <div class="exercise-list">
+          <button class="exercise active" data-exercise="elbow"><span class="num">1</span><span><b>งอ–เหยียดข้อศอก</b><small>Elbow Flexion / Extension</small></span><i>✓</i></button>
+          <button class="exercise" data-exercise="shoulder"><span class="num">2</span><span><b>ยกแขน / กางไหล่</b><small>Shoulder Abduction</small></span><i>✓</i></button>
+          <button class="exercise" data-exercise="squat"><span class="num">3</span><span><b>ย่อเข่า / ลุกนั่ง</b><small>Squat</small></span><i>✓</i></button>
+        </div>
+        <div class="side-title"><span>ข้างที่ตรวจจับ</span><small>DETECTION SIDE</small></div>
+        <div class="segmented"><button class="side active" data-side="left">ซ้าย</button><button class="side" data-side="right">ขวา</button></div>
+        <div class="bottom-actions"><button id="resetBtn">↻ เริ่มใหม่</button><button id="csvBtn">↓ ดาวน์โหลด CSV</button></div>
+      </article>
+    </aside>
+  </section>
+  <footer>PhysioVision AI <span>Browser-based pose analysis</span></footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
