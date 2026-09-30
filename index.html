@@ -1,93 +1,53 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#06111d">
-  <title>PhysioVision AI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PhysioVision AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="shell">
-  <nav class="topbar">
-    <div class="brand"><div class="brandmark">PV</div><div><strong>PhysioVision <span>AI</span></strong><small>SMART MOVEMENT ANALYSIS</small></div></div>
-    <span id="aiBadge" class="badge"><i></i><span>AI พร้อมใช้งาน</span></span>
-  </nav>
+<header><div class="brand"><div class="logo">P</div><div><b>PhysioVision AI</b><small>AI Physical Therapy Assistant</small></div></div><nav>
+<button class="nav active" data-page="home">เริ่มต้น</button><button class="nav" data-page="train">ฝึกกายภาพ</button><button class="nav" data-page="history">ประวัติ</button><button class="nav" data-page="profile">ผู้ใช้งาน</button></nav></header>
+<main>
+<section id="home" class="page active">
+<div class="hero"><div><span class="pill">AI-ASSISTED MOVEMENT TRACKING</span><h1>กายภาพบำบัดอย่างเป็นระบบ<br><em>ติดตามการเคลื่อนไหวแบบเรียลไทม์</em></h1><p>เลือกท่าฝึก อ่านคำแนะนำ และใช้กล้องช่วยติดตามมุมข้อต่อ จำนวนครั้ง และเซตของการฝึก</p><button class="primary" id="goTrain">เริ่มการฝึก →</button></div><div class="heroCard"><div class="pulse">AI</div><h3>พร้อมเริ่มการฝึก</h3><p>ตั้งกล้องให้เห็นข้อต่อที่ใช้ฝึกชัดเจน และเว้นพื้นที่ให้เคลื่อนไหวได้สะดวก</p></div></div>
+<h2>เลือกโปรแกรมฝึก</h2><div class="exerciseGrid">
+<article class="ex" data-ex="elbow"><span>01</span><h3>งอ–เหยียดข้อศอก</h3><p>ติดตามมุม Shoulder–Elbow–Wrist</p><button>เลือกท่านี้</button></article>
+<article class="ex" data-ex="shoulder"><span>02</span><h3>ยกแขนบริหารหัวไหล่</h3><p>ติดตามมุม Hip–Shoulder–Elbow</p><button>เลือกท่านี้</button></article>
+<article class="ex" data-ex="squat"><span>03</span><h3>ย่อเข่า</h3><p>ติดตามมุม Hip–Knee–Ankle</p><button>เลือกท่านี้</button></article></div>
+<div class="notice"><b>ข้อควรทราบ</b><p>ระบบนี้ใช้ช่วยติดตามการเคลื่อนไหวและบันทึกการฝึก ไม่ใช่เครื่องมือวินิจฉัยโรค หากมีอาการปวดผิดปกติ เวียนศีรษะ หรือไม่แน่ใจว่าท่าเหมาะสม ควรหยุดและปรึกษาผู้เชี่ยวชาญด้านสุขภาพ</p></div>
+</section>
 
-  <section class="hero">
-    <div><span class="eyebrow">AI PHYSICAL THERAPY</span><h1>ฝึกกายภาพอย่างมั่นใจ</h1><p>ตรวจจับโครงร่าง วัดมุมข้อต่อ และนับจำนวนครั้งแบบเรียลไทม์</p></div>
-    <div class="session-pill"><small>SESSION</small><b id="sessionStatus">พร้อมเริ่ม</b></div>
-  </section>
+<section id="train" class="page">
+<div class="pageTitle"><div><span class="eyebrow">LIVE SESSION</span><h1>ฝึกกายภาพ</h1><p id="exerciseDesc">งอ–เหยียดข้อศอก • เป้าหมาย 10 ครั้ง × 3 เซต</p></div><button class="ghost" id="backHome">← คำแนะนำ</button></div>
+<div class="dashboard"><div class="cameraCard">
+<div class="stage" id="stage"><video id="video" autoplay playsinline muted></video><canvas id="canvas"></canvas>
+<div class="cameraEmpty" id="cameraEmpty"><b>พร้อมเปิดกล้อง</b><span>วางอุปกรณ์ให้เห็นร่างกายส่วนที่ฝึก</span><button class="primary" id="startCamera">เปิดกล้อง</button></div>
+<div class="liveBadge" id="liveBadge">● LIVE</div><div class="camActions" id="camActions"><button id="switchCamera">↻ <span>สลับกล้อง</span></button><button id="stopCamera">■ <span>ปิดกล้อง</span></button></div></div>
+<div class="statusLine"><span id="tracking">รอเปิดกล้อง</span><span id="fps">0 FPS</span></div></div>
+<div class="side">
+<div class="stats"><div><small>SET</small><strong id="setVal">1/3</strong></div><div><small>REPS</small><strong id="repVal">0/10</strong></div><div><small>ANGLE</small><strong id="angleVal">--°</strong></div><div><small>STATE</small><strong id="stateVal">READY</strong></div></div>
+<div class="panel"><h3>ตั้งค่าการฝึก</h3><label>ท่าฝึก</label><select id="exercise"><option value="elbow">งอ–เหยียดข้อศอก</option><option value="shoulder">ยกแขนบริหารหัวไหล่</option><option value="squat">ย่อเข่า</option></select><label>ด้านที่ติดตาม</label><div class="seg"><button class="sideBtn active" data-side="left">ซ้าย</button><button class="sideBtn" data-side="right">ขวา</button></div></div>
+<div class="panel guide"><h3>คำแนะนำก่อนฝึก</h3><ol id="guideList"></ol></div>
+<div class="actions"><button class="ghost" id="reset">รีเซ็ต</button><button class="primary" id="finish">บันทึกการฝึก</button></div></div></div>
+</section>
 
-  <section class="workspace">
-    <div class="left">
-      <article class="panel camera-panel">
-        <div class="panel-head">
-          <div><span class="live-dot"></span><b>LIVE MOTION ANALYSIS</b></div>
-          <span id="fpsLabel">Camera standby</span>
-        </div>
+<section id="history" class="page">
+<div class="pageTitle"><div><span class="eyebrow">PROGRESS</span><h1>ประวัติการฝึก</h1><p>ข้อมูลถูกเก็บไว้ในเบราว์เซอร์ของอุปกรณ์นี้</p></div><button class="ghost" id="exportCsv">ดาวน์โหลด CSV</button></div>
+<div class="summary"><div><small>ครั้งที่ฝึกทั้งหมด</small><strong id="totalSessions">0</strong></div><div><small>จำนวนครั้งรวม</small><strong id="totalReps">0</strong></div><div><small>เซตที่เสร็จ</small><strong id="totalSets">0</strong></div></div>
+<div class="panel chartPanel"><h3>แนวโน้มจำนวนครั้งในการฝึก</h3><canvas id="historyChart"></canvas><div class="emptyChart" id="emptyChart">ยังไม่มีข้อมูล — เมื่อบันทึกการฝึก กราฟจะแสดงที่นี่</div></div>
+<div class="panel"><div class="tableHead"><h3>รายการล่าสุด</h3><button class="dangerText" id="clearHistory">ล้างประวัติ</button></div><div class="tableWrap"><table><thead><tr><th>วันที่</th><th>ผู้ใช้งาน</th><th>ท่า</th><th>ด้าน</th><th>เซต</th><th>ครั้ง</th><th>เวลา</th></tr></thead><tbody id="historyBody"></tbody></table></div></div>
+</section>
 
-        <div class="stage">
-          <video id="video" playsinline muted></video>
-          <canvas id="canvas"></canvas>
-
-          <div id="message" class="camera-message">
-            <div class="camera-orb">◎</div>
-            <b>พร้อมเริ่มการวิเคราะห์</b>
-            <span>เปิดกล้องเพื่อเริ่มตรวจจับการเคลื่อนไหว</span>
-            <button id="cameraBtn" class="camera-start">เปิดกล้อง</button>
-          </div>
-
-          <div id="cameraControls" class="camera-controls hidden">
-            <button id="switchCameraBtn" title="สลับกล้อง">↻ <span>สลับกล้อง</span></button>
-            <button id="stopCameraBtn" class="danger" title="ปิดกล้อง">■ <span>ปิดกล้อง</span></button>
-          </div>
-
-          <div class="guide"><span>จัดตำแหน่งร่างกายให้อยู่ในกรอบ</span></div>
-
-          <div id="restOverlay" class="rest hidden">
-            <span>พักระหว่างเซต</span><strong id="restCount">30</strong><small>วินาที</small>
-            <button id="skipBtn">ข้ามเวลาพัก</button>
-          </div>
-        </div>
-
-        <div class="camera-footer"><span>● ประมวลผลบนอุปกรณ์ของคุณ</span><span id="trackingText">รอการตรวจจับร่างกาย</span></div>
-      </article>
-
-      <article class="panel tips"><div class="tip-icon">✦</div><div><b>คำแนะนำ</b><p id="tipText">ยืนให้เห็นช่วงไหล่ ศอก และข้อมือชัดเจน เพื่อการวัดมุมที่แม่นยำ</p></div></article>
-    </div>
-
-    <aside class="right">
-      <article class="panel progress-panel">
-        <div class="section-title"><div><span>01</span><b>ความคืบหน้า</b></div><small>LIVE</small></div>
-        <div class="ring-row">
-          <div class="ring" id="repRing"><div><strong id="repsBig">0</strong><span>/ 10 ครั้ง</span></div></div>
-          <div class="set-info"><small>เซตปัจจุบัน</small><strong><span id="setNow">1</span><i>/ 3</i></strong><div class="set-dots"><i class="on"></i><i></i><i></i></div></div>
-        </div>
-        <div class="metric-grid">
-          <div class="metric"><small>มุมข้อต่อ</small><strong id="angle">--°</strong><span>ANGLE</span></div>
-          <div class="metric"><small>สถานะท่า</small><strong id="state">READY</strong><span>STATE</span></div>
-        </div>
-      </article>
-
-      <article class="panel controls">
-        <div class="section-title"><div><span>02</span><b>เลือกท่ากายภาพ</b></div></div>
-        <div class="exercise-list">
-          <button class="exercise active" data-exercise="elbow"><span class="num">1</span><span><b>งอ–เหยียดข้อศอก</b><small>Elbow Flexion / Extension</small></span><i>✓</i></button>
-          <button class="exercise" data-exercise="shoulder"><span class="num">2</span><span><b>ยกแขน / กางไหล่</b><small>Shoulder Abduction</small></span><i>✓</i></button>
-          <button class="exercise" data-exercise="squat"><span class="num">3</span><span><b>ย่อเข่า / ลุกนั่ง</b><small>Squat</small></span><i>✓</i></button>
-        </div>
-        <div class="side-title"><span>ข้างที่ตรวจจับ</span><small>DETECTION SIDE</small></div>
-        <div class="segmented"><button class="side active" data-side="left">ซ้าย</button><button class="side" data-side="right">ขวา</button></div>
-        <div class="bottom-actions"><button id="resetBtn">↻ เริ่มใหม่</button><button id="csvBtn">↓ ดาวน์โหลด CSV</button></div>
-      </article>
-    </aside>
-  </section>
-  <footer>PhysioVision AI <span>Browser-based pose analysis</span></footer>
+<section id="profile" class="page">
+<div class="pageTitle"><div><span class="eyebrow">USER PROFILE</span><h1>ข้อมูลผู้ใช้งาน</h1><p>ใช้ระบุชื่อในประวัติการฝึกบนอุปกรณ์นี้</p></div></div>
+<div class="profileGrid"><div class="panel avatarPanel"><div class="avatar" id="avatar">U</div><h2 id="profileName">ผู้ใช้งาน</h2><p>PhysioVision AI profile</p></div>
+<form class="panel form" id="profileForm"><label>ชื่อ–นามสกุล</label><input id="name" placeholder="เช่น ธนาธรณ์"><label>รหัสผู้ใช้งาน / HN (ไม่บังคับ)</label><input id="userId" placeholder="เช่น PT-001"><label>หมายเหตุ (ไม่บังคับ)</label><textarea id="note" rows="4" placeholder="ข้อมูลที่ต้องการบันทึกในอุปกรณ์นี้"></textarea><button class="primary" type="submit">บันทึกข้อมูล</button><small class="privacy">ข้อมูลโปรไฟล์และประวัติในเวอร์ชันนี้เก็บใน Local Storage ของเบราว์เซอร์ ไม่ได้ส่งขึ้นเซิร์ฟเวอร์</small></form></div>
+</section>
 </main>
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script type="module" src="app.js"></script>
-</body>
-</html>
+</body></html>

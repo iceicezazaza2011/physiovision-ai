@@ -1,311 +1,36 @@
-import {FilesetResolver,PoseLandmarker} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm";
-
-const $=id=>document.getElementById(id);
-const video=$("video"),canvas=$("canvas"),ctx=canvas.getContext("2d");
-
-const CFG={reps:10,sets:3,rest:30};
-const VISIBILITY_MIN=0.18;
-const LOST_FRAME_LIMIT=18;
-const REP_DEBOUNCE_MS=700;
-
-let pose,stream,running=false,exercise="elbow",side="left";
-let facingMode="user";
-let reps=0,setNo=1,phase="ready",resting=false,restEnd=0,lastVideo=-1;
-let displayAngle=null,miss=0,lastRepAt=0,logs=[],frames=0,fpsAt=performance.now();
-
-const con=[
-  [11,13],[13,15],[12,14],[14,16],[11,12],
-  [11,23],[12,24],[23,24],
-  [23,25],[25,27],[24,26],[26,28]
-];
-
-function ids(){
-  const L=side==="left";
-  if(exercise==="elbow") return L?[11,13,15]:[12,14,16];
-  if(exercise==="shoulder") return L?[23,11,13]:[24,12,14];
-  return L?[23,25,27]:[24,26,28];
-}
-
-function validPoint(p){
-  return !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
-}
-
-function visibleEnough(p){
-  // MediaPipe may return a low/undefined visibility while the x/y coordinates
-  // are still usable. Keep a modest threshold and never reject undefined visibility.
-  return validPoint(p) && (p.visibility==null || p.visibility>=VISIBILITY_MIN);
-}
-
-function ang(a,b,c){
-  if(!validPoint(a)||!validPoint(b)||!validPoint(c)) return null;
-  const abx=a.x-b.x, aby=a.y-b.y;
-  const cbx=c.x-b.x, cby=c.y-b.y;
-  const mag1=Math.hypot(abx,aby), mag2=Math.hypot(cbx,cby);
-  if(mag1<1e-6||mag2<1e-6) return null;
-  let cosine=(abx*cbx+aby*cby)/(mag1*mag2);
-  cosine=Math.max(-1,Math.min(1,cosine));
-  return Math.acos(cosine)*180/Math.PI;
-}
-
-function limits(){
-  if(exercise==="elbow") return {low:70,high:145};
-  if(exercise==="shoulder") return {low:35,high:75};
-  return {low:100,high:155};
-}
-
-function stateForAngle(a){
-  if(a==null) return "position";
-  const t=limits();
-  if(exercise==="squat"){
-    if(a<t.low) return "down";
-    if(a>t.high) return "up";
-    return phase==="ready"?"moving":phase;
-  }
-  if(a<t.low) return "contracted";
-  if(a>t.high) return "extended";
-  return phase==="ready"?"moving":phase;
-}
-
-function count(a){
-  if(resting||a==null)return;
-  const t=limits(),now=performance.now();
-
-  if(exercise==="squat"){
-    if(a<t.low) phase="down";
-    if(a>t.high && phase==="down" && now-lastRepAt>REP_DEBOUNCE_MS){
-      phase="up"; rep(now);
-    }
-  }else{
-    if(a<t.low) phase="contracted";
-    if(a>t.high && phase==="contracted" && now-lastRepAt>REP_DEBOUNCE_MS){
-      phase="extended"; rep(now);
-    }
-  }
-}
-
-function rep(now){
-  lastRepAt=now;
-  reps++;
-  if(reps>=CFG.reps){
-    logs.push({time:new Date().toISOString(),exercise,side,set:setNo,reps});
-    if(setNo>=CFG.sets){
-      phase="complete";
-      $("sessionStatus").textContent="ฝึกครบแล้ว";
-    }else{
-      resting=true;
-      restEnd=Date.now()+CFG.rest*1000;
-      phase="rest";
-    }
-  }
-}
-
-function nextSet(){
-  if(setNo<CFG.sets){
-    resting=false; setNo++; reps=0; phase="ready";
-    displayAngle=null; miss=0;
-  }
-}
-
-function ui(){
-  const p=Math.min(1,reps/CFG.reps);
-  $("repRing").style.setProperty("--p",`${p*360}deg`);
-  $("repsBig").textContent=reps;
-  $("setNow").textContent=setNo;
-  $("angle").textContent=displayAngle==null?"--°":`${Math.round(displayAngle)}°`;
-  $("state").textContent=resting?"REST":phase.toUpperCase();
-
-  document.querySelectorAll(".set-dots i").forEach((d,i)=>d.classList.toggle("on",i<setNo));
-
-  if(resting){
-    const l=Math.max(0,Math.ceil((restEnd-Date.now())/1000));
-    $("restCount").textContent=l;
-    $("restOverlay").classList.remove("hidden");
-    if(l<=0) nextSet();
-  }else{
-    $("restOverlay").classList.add("hidden");
-  }
-}
-
-function draw(r){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const lm=r?.landmarks?.[0];
-
-  if(!lm){
-    miss++;
-    phase=resting?"rest":"position";
-    if(miss>LOST_FRAME_LIMIT) displayAngle=null;
-    $("trackingText").textContent="ไม่พบร่างกาย";
-    return;
-  }
-
-  ctx.lineWidth=3;
-  ctx.lineCap="round";
-  ctx.strokeStyle="#35e0c3";
-  ctx.fillStyle="#ffd166";
-
-  for(const [a,b] of con){
-    if(!visibleEnough(lm[a])||!visibleEnough(lm[b])) continue;
-    ctx.beginPath();
-    ctx.moveTo(lm[a].x*canvas.width,lm[a].y*canvas.height);
-    ctx.lineTo(lm[b].x*canvas.width,lm[b].y*canvas.height);
-    ctx.stroke();
-  }
-
-  const selected=ids();
-  const main=new Set(selected);
-
-  for(let i=0;i<lm.length;i++){
-    const p=lm[i];
-    if(!visibleEnough(p)) continue;
-    ctx.beginPath();
-    ctx.arc(p.x*canvas.width,p.y*canvas.height,main.has(i)?7:3,0,Math.PI*2);
-    ctx.fill();
-  }
-
-  const [a,b,c]=selected;
-  const pts=[lm[a],lm[b],lm[c]];
-  const usable=pts.every(validPoint);
-  const visible=pts.every(visibleEnough);
-
-  if(usable){
-    const raw=ang(...pts);
-    if(raw!=null && Number.isFinite(raw)){
-      // Keep angle responsive but suppress single-frame jitter.
-      displayAngle=displayAngle==null?raw:(displayAngle*0.68+raw*0.32);
-      miss=0;
-
-      if(visible){
-        $("trackingText").textContent=`ตรวจจับร่างกายแล้ว · ${side==="left"?"LEFT":"RIGHT"}`;
-        count(displayAngle);
-        if(phase==="ready"||phase==="position") phase=stateForAngle(displayAngle);
-      }else{
-        // Coordinates are usable, but confidence is weak: show the angle,
-        // do not count a repetition until confidence improves.
-        $("trackingText").textContent=`เห็นข้อต่อ แต่ความมั่นใจต่ำ · ${side==="left"?"LEFT":"RIGHT"}`;
-        phase="position";
-      }
-      return;
-    }
-  }
-
-  miss++;
-  phase=resting?"rest":"position";
-  $("trackingText").textContent=`จัดตำแหน่ง ${side==="left"?"ด้านซ้าย":"ด้านขวา"} ให้เห็นครบ`;
-  if(miss>LOST_FRAME_LIMIT) displayAngle=null;
-}
-
-async function init(){
-  $("aiBadge").lastElementChild.textContent="กำลังโหลด AI";
-  const v=await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm"
-  );
-  pose=await PoseLandmarker.createFromOptions(v,{
-    baseOptions:{modelAssetPath:"pose_landmarker_lite.task",delegate:"GPU"},
-    runningMode:"VIDEO",
-    numPoses:1,
-    minPoseDetectionConfidence:.5,
-    minPosePresenceConfidence:.5,
-    minTrackingConfidence:.5
-  });
-  $("aiBadge").lastElementChild.textContent="AI พร้อมใช้งาน";
-}
-
-async function start(){
-  try{
-    if(!pose) await init();
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:facingMode},width:{ideal:1280},height:{ideal:720}},
-      audio:false
-    });
-    video.srcObject=stream;
-    await video.play();
-    canvas.width=video.videoWidth;
-    canvas.height=video.videoHeight;
-    $("message").style.display="none";
-    $("cameraControls")?.classList.remove("hidden");
-    running=true;
-    $("sessionStatus").textContent="กำลังฝึก";
-    requestAnimationFrame(loop);
-  }catch(e){
-    $("message").style.display="flex";
-    $("message").innerHTML=`<b>เปิดกล้องไม่สำเร็จ</b><span>${e.message}</span>`;
-  }
-}
-
-function stop(){
-  running=false;
-  stream?.getTracks().forEach(t=>t.stop());
-  stream=null;
-  video.srcObject=null;
-  $("cameraControls")?.classList.add("hidden");
-  $("sessionStatus").textContent="พร้อมเริ่ม";
-  $("message").style.display="flex";
-  $("message").innerHTML='<div class="camera-orb">◎</div><b>กล้องปิดอยู่</b><span>กดปุ่มด้านล่างเพื่อเริ่มอีกครั้ง</span><button id="cameraBtn" class="camera-start">เปิดกล้อง</button>';
-  $("cameraBtn").onclick=start;
-}
-
-function loop(){
-  if(!running)return;
-  if(video.currentTime!==lastVideo){
-    lastVideo=video.currentTime;
-    draw(pose.detectForVideo(video,performance.now()));
-    frames++;
-    const n=performance.now();
-    if(n-fpsAt>1000){
-      $("fpsLabel").textContent=`${frames} FPS · AI tracking`;
-      frames=0; fpsAt=n;
-    }
-  }
-  ui();
-  requestAnimationFrame(loop);
-}
-
-function reset(){
-  reps=0;setNo=1;phase="ready";resting=false;
-  displayAngle=null;miss=0;logs=[];lastRepAt=0;
-  ui();
-}
-
-$("cameraBtn").onclick=start;
-$("stopCameraBtn").onclick=stop;
-$("switchCameraBtn").onclick=async()=>{
-  const wasRunning=!!stream;
-  if(wasRunning){
-    running=false;
-    stream?.getTracks().forEach(t=>t.stop());
-    stream=null;
-    video.srcObject=null;
-  }
-  facingMode=facingMode==="user"?"environment":"user";
-  await start();
-};
-$("skipBtn").onclick=nextSet;
-$("resetBtn").onclick=reset;
-
-document.querySelectorAll(".exercise").forEach(b=>b.onclick=()=>{
-  exercise=b.dataset.exercise;
-  document.querySelectorAll(".exercise").forEach(x=>x.classList.toggle("active",x===b));
-  $("tipText").textContent=
-    exercise==="elbow"?"ยืนให้เห็นช่วงไหล่ ศอก และข้อมือชัดเจน เพื่อการวัดมุมที่แม่นยำ":
-    exercise==="shoulder"?"ยืนให้เห็นลำตัว ไหล่ และข้อศอก โดยเว้นพื้นที่ด้านข้างสำหรับยกแขน":
-    "ถอยจากกล้องให้เห็นสะโพก เข่า และข้อเท้าครบทั้งสามจุด";
-  reset();
-});
-
-document.querySelectorAll(".side").forEach(b=>b.onclick=()=>{
-  side=b.dataset.side;
-  document.querySelectorAll(".side").forEach(x=>x.classList.toggle("active",x===b));
-  reset();
-});
-
-$("csvBtn").onclick=()=>{
-  const rows=[["time","exercise","side","set","reps"],...logs.map(x=>[x.time,x.exercise,x.side,x.set,x.reps])];
-  const blob=new Blob(["\ufeff"+rows.map(r=>r.join(",")).join("\n")],{type:"text/csv;charset=utf-8"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="workout_session.csv";
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),500);
-};
-
-ui();
+import {FilesetResolver,PoseLandmarker,DrawingUtils} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/+esm";
+const $=id=>document.getElementById(id), qsa=s=>[...document.querySelectorAll(s)];
+let pose=null,stream=null,running=false,lastVideoTime=-1,lastTs=performance.now(),frames=0,facingMode="user",side="left",exercise="elbow",reps=0,setNo=1,phase="ready",resting=false,lastRep=0,displayAngle=null,lost=0,sessionStart=null,chart=null;
+const CFG={target:10,sets:3,rest:30}, VIS=.18;
+const guides={elbow:["ยืนหรือนั่งให้มั่นคงและให้กล้องเห็นหัวไหล่ ข้อศอก และข้อมือ","วางแขนด้านที่เลือกให้อยู่ในภาพครบ","งอและเหยียดอย่างช้า ๆ โดยไม่ฝืนช่วงการเคลื่อนไหว"],shoulder:["ให้กล้องเห็นลำตัว หัวไหล่ และข้อศอกชัดเจน","รักษาลำตัวให้มั่นคงระหว่างยกแขน","ยกแขนในช่วงที่ทำได้โดยไม่ฝืนหรือเกิดอาการปวด"],squat:["ตั้งกล้องให้เห็นสะโพก เข่า และข้อเท้า","ยืนในท่ามั่นคงและเว้นพื้นที่รอบตัว","ย่อเข่าอย่างควบคุมและกลับสู่ท่ายืนโดยไม่รีบ"]};
+const names={elbow:"งอ–เหยียดข้อศอก",shoulder:"ยกแขนบริหารหัวไหล่",squat:"ย่อเข่า"};
+function toast(t){$("toast").textContent=t;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2200)}
+function page(id){qsa(".page").forEach(x=>x.classList.toggle("active",x.id===id));qsa(".nav").forEach(x=>x.classList.toggle("active",x.dataset.page===id));if(id==="history")renderHistory();scrollTo(0,0)}
+qsa(".nav").forEach(b=>b.onclick=()=>page(b.dataset.page));$("goTrain").onclick=()=>page("train");$("backHome").onclick=()=>page("home");qsa(".ex").forEach(c=>c.querySelector("button").onclick=()=>{exercise=c.dataset.ex;$("exercise").value=exercise;updateGuide();reset();page("train")});
+function updateGuide(){exercise=$("exercise").value;$("guideList").innerHTML=guides[exercise].map(x=>`<li>${x}</li>`).join("");$("exerciseDesc").textContent=`${names[exercise]} • เป้าหมาย ${CFG.target} ครั้ง × ${CFG.sets} เซต`}
+$("exercise").onchange=()=>{updateGuide();reset()};qsa(".sideBtn").forEach(b=>b.onclick=()=>{qsa(".sideBtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");side=b.dataset.side});
+function reset(){reps=0;setNo=1;phase="ready";resting=false;displayAngle=null;sessionStart=running?Date.now():null;ui()}
+$("reset").onclick=reset;
+function ui(){ $("setVal").textContent=`${setNo}/${CFG.sets}`;$("repVal").textContent=`${reps}/${CFG.target}`;$("angleVal").textContent=displayAngle==null?"--°":`${Math.round(displayAngle)}°`;$("stateVal").textContent=phase.toUpperCase()}
+async function initPose(){if(pose)return;const v=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm");pose=await PoseLandmarker.createFromOptions(v,{baseOptions:{modelAssetPath:"pose_landmarker_lite.task",delegate:"GPU"},runningMode:"VIDEO",numPoses:1,minPoseDetectionConfidence:.45,minTrackingConfidence:.45})}
+async function startCamera(){try{await initPose();if(stream)stream.getTracks().forEach(t=>t.stop());stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode},width:{ideal:1280},height:{ideal:720}},audio:false});$("video").srcObject=stream;await $("video").play();running=true;sessionStart=sessionStart||Date.now();$("cameraEmpty").style.display="none";$("camActions").style.display="flex";$("liveBadge").style.display="block";$("tracking").textContent="กำลังตรวจจับท่าทาง";requestAnimationFrame(loop)}catch(e){console.error(e);toast("เปิดกล้องไม่สำเร็จ กรุณาตรวจสอบสิทธิ์กล้อง")}}
+function stopCamera(){running=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$("cameraEmpty").style.display="flex";$("camActions").style.display="none";$("liveBadge").style.display="none";$("tracking").textContent="กล้องปิดอยู่"}
+$("startCamera").onclick=startCamera;$("stopCamera").onclick=stopCamera;$("switchCamera").onclick=async()=>{facingMode=facingMode==="user"?"environment":"user";await startCamera()};
+function angle(a,b,c){const ab=[a.x-b.x,a.y-b.y],cb=[c.x-b.x,c.y-b.y],dot=ab[0]*cb[0]+ab[1]*cb[1],m=Math.hypot(...ab)*Math.hypot(...cb);if(!m)return null;return Math.acos(Math.max(-1,Math.min(1,dot/m)))*180/Math.PI}
+function triplet(lm){const L=side==="left";if(exercise==="elbow")return [lm[L?11:12],lm[L?13:14],lm[L?15:16]];if(exercise==="shoulder")return [lm[L?23:24],lm[L?11:12],lm[L?13:14]];return [lm[L?23:24],lm[L?25:26],lm[L?27:28]]}
+function confident(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&(p.visibility??1)>=VIS}
+function count(a,ok){if(!ok||resting||phase==="complete")return;let low,high;if(exercise==="elbow"){low=65;high=150}else if(exercise==="shoulder"){low=35;high=100}else{low=95;high=155}
+if(a>=high)phase="extended";if(a<=low&&phase==="extended"&&Date.now()-lastRep>700){reps++;lastRep=Date.now();phase="flexed";if(reps>=CFG.target){if(setNo>=CFG.sets){reps=CFG.target;phase="complete"}else{setNo++;reps=0;resting=true;phase="rest";setTimeout(()=>{resting=false;phase="ready";ui()},CFG.rest*1000)}}ui()}}
+async function loop(ts){if(!running)return;const v=$("video"),c=$("canvas");if(v.readyState>=2&&v.currentTime!==lastVideoTime){lastVideoTime=v.currentTime;c.width=v.videoWidth;c.height=v.videoHeight;const res=pose.detectForVideo(v,performance.now()),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);if(res.landmarks?.length){lost=0;const lm=res.landmarks[0],du=new DrawingUtils(ctx);du.drawConnectors(lm,PoseLandmarker.POSE_CONNECTIONS,{color:"#58d8ef",lineWidth:3});du.drawLandmarks(lm,{color:"#ffffff",fillColor:"#1878e8",radius:3});const [a,b,d]=triplet(lm),raw=angle(a,b,d);if(raw!=null){displayAngle=displayAngle==null?raw:displayAngle*.68+raw*.32;count(displayAngle,confident(a)&&confident(b)&&confident(d));ui()}$("tracking").textContent=`ตรวจจับ ${side==="left"?"ซ้าย":"ขวา"} • ${names[exercise]}`}else{lost++;if(lost>18){displayAngle=null;$("angleVal").textContent="--°";$("tracking").textContent="จัดตำแหน่งร่างกายให้อยู่ในภาพ"}}frames++;if(ts-lastTs>1000){$("fps").textContent=`${Math.round(frames*1000/(ts-lastTs))} FPS`;frames=0;lastTs=ts}}
+requestAnimationFrame(loop)}
+function profile(){return JSON.parse(localStorage.getItem("pv_profile")||'{"name":"","userId":"","note":""}')}
+function history(){return JSON.parse(localStorage.getItem("pv_history")||"[]")}
+$("finish").onclick=()=>{const h=history(),elapsed=sessionStart?Math.max(1,Math.round((Date.now()-sessionStart)/1000)):0,total=(setNo-1)*CFG.target+reps;h.unshift({date:new Date().toISOString(),name:profile().name||"ผู้ใช้งาน",exercise,side,sets:phase==="complete"?CFG.sets:Math.max(0,setNo-1),reps:total,seconds:elapsed});localStorage.setItem("pv_history",JSON.stringify(h.slice(0,100)));toast("บันทึกการฝึกแล้ว");page("history")};
+function renderHistory(){const h=history();$("totalSessions").textContent=h.length;$("totalReps").textContent=h.reduce((s,x)=>s+(x.reps||0),0);$("totalSets").textContent=h.reduce((s,x)=>s+(x.sets||0),0);$("historyBody").innerHTML=h.length?h.slice(0,20).map(x=>`<tr><td>${new Date(x.date).toLocaleString("th-TH",{dateStyle:"short",timeStyle:"short"})}</td><td>${esc(x.name)}</td><td>${names[x.exercise]||x.exercise}</td><td>${x.side==="left"?"ซ้าย":"ขวา"}</td><td>${x.sets}</td><td>${x.reps}</td><td>${Math.floor(x.seconds/60)}:${String(x.seconds%60).padStart(2,"0")}</td></tr>`).join(""):`<tr><td colspan="7">ยังไม่มีประวัติการฝึก</td></tr>`;renderChart(h)}
+function renderChart(h){const rows=h.slice(0,10).reverse();$("emptyChart").style.display=rows.length?"none":"grid";if(chart)chart.destroy();if(!rows.length)return;chart=new Chart($("historyChart"),{type:"line",data:{labels:rows.map(x=>new Date(x.date).toLocaleDateString("th-TH",{day:"numeric",month:"short"})),datasets:[{label:"จำนวนครั้ง",data:rows.map(x=>x.reps),tension:.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}})}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+$("clearHistory").onclick=()=>{if(confirm("ต้องการล้างประวัติการฝึกทั้งหมดในอุปกรณ์นี้หรือไม่?")){localStorage.removeItem("pv_history");renderHistory();toast("ล้างประวัติแล้ว")}};
+$("exportCsv").onclick=()=>{const h=history();if(!h.length)return toast("ยังไม่มีข้อมูลสำหรับส่งออก");const rows=[["date","name","exercise","side","sets","reps","seconds"],...h.map(x=>[x.date,x.name,names[x.exercise],x.side,x.sets,x.reps,x.seconds])];const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="physiovision-history.csv";a.click();URL.revokeObjectURL(a.href)};
+function loadProfile(){const p=profile();$("name").value=p.name;$("userId").value=p.userId;$("note").value=p.note;$("profileName").textContent=p.name||"ผู้ใช้งาน";$("avatar").textContent=(p.name||"U").trim()[0]?.toUpperCase()||"U"}
+$("profileForm").onsubmit=e=>{e.preventDefault();const p={name:$("name").value.trim(),userId:$("userId").value.trim(),note:$("note").value.trim()};localStorage.setItem("pv_profile",JSON.stringify(p));loadProfile();toast("บันทึกข้อมูลผู้ใช้งานแล้ว")};
+updateGuide();loadProfile();ui();

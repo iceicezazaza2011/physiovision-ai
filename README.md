@@ -1,18 +1,13 @@
-# PhysioVision AI V4 Mobile
+# PhysioVision AI V5 Full
 
-Changes:
-- Camera start button is now inside the camera area.
-- While the camera is running, Stop and Switch Camera controls float over the camera.
-- Responsive mobile-first layout.
-- Mobile camera uses a portrait-friendly stage and supports front/rear camera switching.
-- Keeps the V3 angle/rep logic.
+Static GitHub Pages version with:
+- Start page and pre-exercise guidance
+- Real-time MediaPipe pose tracking
+- Reps / sets / angle tracking
+- User profile stored in browser Local Storage
+- Session history, chart and CSV export
+- Responsive desktop/mobile UI
 
-Keep your existing `pose_landmarker_lite.task` beside these files.
+Keep `pose_landmarker_lite.task` in the repository root beside `index.html`.
 
-Local test:
-python -m http.server 5500
-
-Then open http://localhost:5500
-PhysioVision AI - GitHub Pages
-
-Deployment update - 30 Sep 2026
+> This is an AI-assisted movement tracking prototype, not a diagnostic medical device.
